@@ -1,93 +1,118 @@
-!DOCTYPE html
-html
-head
-  meta charset=UTF-8
-  script src=httpslf3-static.bytednsdoc.comobjeden-cnptlz_zlpljhwZthlaukjlkulzlpjs-sdkbitable_ext_sdk_v2.jsscript
-  style
-    body { font-family sans-serif; padding 15px; background #fff; }
-    #btn { width 100%; padding 12px; background #3370ff; color #fff; border none; border-radius 4px; cursor pointer; font-weight bold; }
-    #btndisabled { background #ccc; cursor not-allowed; }
-    #log { margin-top 15px; font-size 12px; color #666; height 350px; overflow-y auto; border 1px solid #eee; padding 8px; background #fafafa; }
-  style
-head
-body
-  h4达人汇总助手（防报错增强版）h4
-  button id=btn一键同步所有达人数据button
-  div id=log等待飞书环境加载...div
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/js-sdk/bitable_ext_sdk_v2.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 15px; background: #fff; }
+    #btn { width: 100%; padding: 12px; background: #ccc; color: #fff; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; transition: 0.3s; }
+    #btn.ready { background: #3370ff; cursor: pointer; }
+    #log { margin-top: 15px; font-size: 12px; color: #666; height: 350px; overflow-y: auto; border: 1px solid #eee; padding: 8px; background: #fafafa; }
+    .success { color: #52c41a; } .error { color: #f5222d; }
+  </style>
+</head>
+<body>
+  <h4>达人库极速汇总 (V3.0 稳定版)</h4>
+  <button id="btn" disabled>正在初始化飞书环境...</button>
+  <div id="log">等待环境中...请确保在飞书侧边栏打开。</div>
 
-  script
+  <script>
     const btn = document.getElementById('btn');
     const logEl = document.getElementById('log');
-    function log(m) { logEl.innerHTML += `div${new Date().toLocaleTimeString()} ${m}div`; logEl.scrollTop = logEl.scrollHeight; }
+    function log(m, type = '') { 
+      logEl.innerHTML += `<div class="${type}">${new Date().toLocaleTimeString()}: ${m}</div>`; 
+      logEl.scrollTop = logEl.scrollHeight; 
+    }
 
-     自动检查环境
-    setInterval(() = {
-        if (window.bitable && logEl.innerText === 等待飞书环境加载...) {
-            logEl.innerText = ✅ 环境已就绪，可以开始同步。;
-        }
-    }, 1000);
-
-    btn.onclick = async () = {
-      if (typeof window.bitable === 'undefined') {
-        log(❌ 报错：依然未检测到飞书环境！请务必在飞书多维表格【右侧插件面板】运行。);
-        return;
+    // --- 自动检测飞书环境是否加载成功 ---
+    const checkTimer = setInterval(() => {
+      if (window.bitable) {
+        clearInterval(checkTimer);
+        btn.disabled = false;
+        btn.className = 'ready';
+        btn.innerText = '一键同步所有达人数据';
+        log("✅ 环境加载成功，可以开始同步。", "success");
       }
+    }, 500);
 
+    btn.onclick = async () => {
       btn.disabled = true;
-      log(🚀 正在连接数据中心...);
+      btn.innerText = '正在同步中...';
+      log("🚀 启动数据汇总程序...");
       
       try {
         const bitable = window.bitable;
-        const base = await bitable.base;
+        const base = await bitable.base; // 这里不会再报 undefined 错误了
         
-        const targetTable = await base.getTableByName(达人初筛);
-        const dyTable = await base.getTableByName(抖音达人库);
-        const xhsTable = await base.getTableByName(小红书达人库);
+        // 1. 指定三张表格的名字
+        const targetTable = await base.getTableByName("达人初筛");
+        const dyTable = await base.getTableByName("抖音达人库");
+        const xhsTable = await base.getTableByName("小红书达人库");
 
-        log(🔍 正在扫描主表已有 ID...);
-        const targetRecords = await targetTable.getRecords({ max_count 10000 });
+        // 2. 建立查重索引（主键：达人ID）
+        log("🔍 正在扫描主表已有的达人...");
+        const targetRecords = await targetTable.getRecords({ max_count: 10000 });
         const masterMap = new Map();
-        targetRecords.records.forEach(r = { 
-          if(r.fields[达人ID]) masterMap.set(String(r.fields[达人ID]), r.id); 
+        targetRecords.records.forEach(r => { 
+          const id = r.fields["达人ID"];
+          if(id) masterMap.set(String(id), r.id); 
         });
 
+        // 3. 配置你的 10 个字段映射关系
         const configs = [
           {
-            name 抖音达人库, platform 抖音,
-            map { 平台 平台, 达人ID 达人UID, 达人昵称 达人昵称, 链接 达人链接, 主页图文 视频图片, 视频 视频图片, 下载人 备注, 达人简介 达人简介, 平台账号 抖音号 }
+            platform: "抖音", table: dyTable,
+            map: { 
+              "平台": "平台", "达人ID": "达人UID", "达人昵称": "达人昵称", "链接": "达人链接", 
+              "主页图文": "视频图片", "视频": "视频图片", "下载人": "备注", "达人简介": "达人简介", "平台账号": "抖音号" 
+            }
           },
           {
-            name 小红书达人库, platform 小红书,
-            map { 平台 平台, 达人ID 博主ID, 达人昵称 博主昵称, 链接 博主链接, 主页图文 笔记封面, 视频 笔记视频, 下载人 备注, 达人简介 博主简介, 平台账号 小红书号 }
+            platform: "小红书", table: xhsTable,
+            map: { 
+              "平台": "平台", "达人ID": "博主ID", "达人昵称": "博主昵称", "链接": "博主链接", 
+              "主页图文": "笔记封面", "视频": "笔记视频", "下载人": "备注", "达人简介": "博主简介", "平台账号": "小红书号" 
+            }
           }
         ];
 
         for (const config of configs) {
-          log(`正在读取 [${config.name}]...`);
-          const srcTable = (config.platform === 抖音)  dyTable  xhsTable;
-          const srcRecords = await srcTable.getRecords({ max_count 5000 });
+          log(`正在读取 [${config.platform}库]...`);
+          const srcRecords = await config.table.getRecords({ max_count: 5000 });
           
           const toAdd = [], toUpdate = [];
-          srcRecords.records.forEach(r = {
-            const idVal = String(r.fields[config.map[达人ID]]  );
-            if(!idVal) return;
+          srcRecords.records.forEach(r => {
+            const rawId = r.fields[config.map["达人ID"]];
+            if(!rawId) return;
+            const idVal = String(rawId);
+
             const fields = {};
-            for(let k in config.map) { fields[k] = r.fields[config.map[k]]; }
-            fields[平台] = config.platform;
-            if(masterMap.has(idVal)) { toUpdate.push({ recordId masterMap.get(idVal), fields }); }
-            else { toAdd.push({ fields }); }
+            // 字段对齐逻辑
+            for(let targetKey in config.map) {
+              fields[targetKey] = r.fields[config.map[targetKey]];
+            }
+            fields["平台"] = config.platform;
+
+            if(masterMap.has(idVal)) {
+              toUpdate.push({ recordId: masterMap.get(idVal), fields });
+            } else {
+              toAdd.push({ fields });
+            }
           });
 
-          for (let i = 0; i  toAdd.length; i += 500) { await targetTable.addRecords(toAdd.slice(i, i + 500)); }
-          for (let i = 0; i  toUpdate.length; i += 500) { await targetTable.setRecords(toUpdate.slice(i, i + 500)); }
-          log(`✅ [${config.platform}] 完成：新增 ${toAdd.length}，更新 ${toUpdate.length}`);
+          // 分批写入，每批 500 条
+          for (let i = 0; i < toAdd.length; i += 500) { await targetTable.addRecords(toAdd.slice(i, i + 500)); }
+          for (let i = 0; i < toUpdate.length; i += 500) { await targetTable.setRecords(toUpdate.slice(i, i + 500)); }
+          log(`✅ [${config.platform}] 新增 ${toAdd.length} 条，更新 ${toUpdate.length} 条`, "success");
         }
-        log(🎉 同步大功告成！);
+        log("🎉 全部任务同步完成！");
       } catch (e) {
-        log(❌ 出错了： + e.message);
+        log("❌ 出错了：" + e.message, "error");
+        console.error(e);
       }
       btn.disabled = false;
+      btn.innerText = '一键同步所有达人数据';
     };
-  script
-body
-html
+  </script>
+</body>
+</html>
