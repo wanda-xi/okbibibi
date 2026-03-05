@@ -1,0 +1,93 @@
+!DOCTYPE html
+html
+head
+  meta charset=UTF-8
+  script src=httpslf3-static.bytednsdoc.comobjeden-cnptlz_zlpljhwZthlaukjlkulzlpjs-sdkbitable_ext_sdk_v2.jsscript
+  style
+    body { font-family sans-serif; padding 15px; background #fff; }
+    #btn { width 100%; padding 12px; background #3370ff; color #fff; border none; border-radius 4px; cursor pointer; font-weight bold; }
+    #btndisabled { background #ccc; cursor not-allowed; }
+    #log { margin-top 15px; font-size 12px; color #666; height 350px; overflow-y auto; border 1px solid #eee; padding 8px; background #fafafa; }
+  style
+head
+body
+  h4达人汇总助手（防报错增强版）h4
+  button id=btn一键同步所有达人数据button
+  div id=log等待飞书环境加载...div
+
+  script
+    const btn = document.getElementById('btn');
+    const logEl = document.getElementById('log');
+    function log(m) { logEl.innerHTML += `div${new Date().toLocaleTimeString()} ${m}div`; logEl.scrollTop = logEl.scrollHeight; }
+
+     自动检查环境
+    setInterval(() = {
+        if (window.bitable && logEl.innerText === 等待飞书环境加载...) {
+            logEl.innerText = ✅ 环境已就绪，可以开始同步。;
+        }
+    }, 1000);
+
+    btn.onclick = async () = {
+      if (typeof window.bitable === 'undefined') {
+        log(❌ 报错：依然未检测到飞书环境！请务必在飞书多维表格【右侧插件面板】运行。);
+        return;
+      }
+
+      btn.disabled = true;
+      log(🚀 正在连接数据中心...);
+      
+      try {
+        const bitable = window.bitable;
+        const base = await bitable.base;
+        
+        const targetTable = await base.getTableByName(达人初筛);
+        const dyTable = await base.getTableByName(抖音达人库);
+        const xhsTable = await base.getTableByName(小红书达人库);
+
+        log(🔍 正在扫描主表已有 ID...);
+        const targetRecords = await targetTable.getRecords({ max_count 10000 });
+        const masterMap = new Map();
+        targetRecords.records.forEach(r = { 
+          if(r.fields[达人ID]) masterMap.set(String(r.fields[达人ID]), r.id); 
+        });
+
+        const configs = [
+          {
+            name 抖音达人库, platform 抖音,
+            map { 平台 平台, 达人ID 达人UID, 达人昵称 达人昵称, 链接 达人链接, 主页图文 视频图片, 视频 视频图片, 下载人 备注, 达人简介 达人简介, 平台账号 抖音号 }
+          },
+          {
+            name 小红书达人库, platform 小红书,
+            map { 平台 平台, 达人ID 博主ID, 达人昵称 博主昵称, 链接 博主链接, 主页图文 笔记封面, 视频 笔记视频, 下载人 备注, 达人简介 博主简介, 平台账号 小红书号 }
+          }
+        ];
+
+        for (const config of configs) {
+          log(`正在读取 [${config.name}]...`);
+          const srcTable = (config.platform === 抖音)  dyTable  xhsTable;
+          const srcRecords = await srcTable.getRecords({ max_count 5000 });
+          
+          const toAdd = [], toUpdate = [];
+          srcRecords.records.forEach(r = {
+            const idVal = String(r.fields[config.map[达人ID]]  );
+            if(!idVal) return;
+            const fields = {};
+            for(let k in config.map) { fields[k] = r.fields[config.map[k]]; }
+            fields[平台] = config.platform;
+            if(masterMap.has(idVal)) { toUpdate.push({ recordId masterMap.get(idVal), fields }); }
+            else { toAdd.push({ fields }); }
+          });
+
+          for (let i = 0; i  toAdd.length; i += 500) { await targetTable.addRecords(toAdd.slice(i, i + 500)); }
+          for (let i = 0; i  toUpdate.length; i += 500) { await targetTable.setRecords(toUpdate.slice(i, i + 500)); }
+          log(`✅ [${config.platform}] 完成：新增 ${toAdd.length}，更新 ${toUpdate.length}`);
+        }
+        log(🎉 同步大功告成！);
+      } catch (e) {
+        log(❌ 出错了： + e.message);
+      }
+      btn.disabled = false;
+    };
+  script
+body
+html
